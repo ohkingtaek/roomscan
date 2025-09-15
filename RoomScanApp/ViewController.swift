@@ -144,19 +144,124 @@ extension ViewController: RoomCaptureViewControllerDelegate {
         do {
             try room.export(to: fileURL)
             print("USDZ 파일이 저장되었습니다: \(fileURL.path)")
+            
+            // 파일 저장 검증
+            if verifyFileSaved(at: fileURL) {
+                print("✅ 파일 저장 검증 성공: \(fileURL.path)")
+                print("📁 파일 크기: \(getFileSize(fileURL)) bytes")
+                showSaveSuccessAlert(fileURL: fileURL)
+            } else {
+                print("❌ 파일 저장 검증 실패")
+                showSaveFailureAlert(errorMessage: "파일이 저장되었지만 검증에 실패했습니다.")
+            }
         } catch {
             print("USDZ 파일 저장 실패: \(error.localizedDescription)")
+            showSaveFailureAlert(errorMessage: error.localizedDescription)
         }
     }
     
-    private func showScanResult(_ room: CapturedRoom) {
+    // MARK: - File Verification
+    private func verifyFileSaved(at fileURL: URL) -> Bool {
+        let fileManager = FileManager.default
+        
+        // 1. 파일 존재 여부 확인
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            print("❌ 파일이 존재하지 않습니다: \(fileURL.path)")
+            return false
+        }
+        
+        // 2. 파일 크기 확인 (최소 1KB 이상이어야 함)
+        do {
+            let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
+            if let fileSize = attributes[.size] as? Int64 {
+                print("📊 파일 크기: \(fileSize) bytes")
+                if fileSize < 1024 {
+                    print("❌ 파일 크기가 너무 작습니다: \(fileSize) bytes")
+                    return false
+                }
+                return true
+            } else {
+                print("❌ 파일 크기 정보를 가져올 수 없습니다")
+                return false
+            }
+        } catch {
+            print("❌ 파일 속성 확인 실패: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    private func getFileSize(_ fileURL: URL) -> String {
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            if let fileSize = attributes[.size] as? Int64 {
+                return formatFileSize(fileSize)
+            }
+        } catch {
+            print("파일 크기 확인 실패: \(error.localizedDescription)")
+        }
+        return "알 수 없음"
+    }
+    
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+    
+    private func showSaveSuccessAlert(fileURL: URL) {
+        let fileSize = getFileSize(fileURL)
+        let fileName = fileURL.lastPathComponent
+        
         let alert = UIAlertController(
-            title: "스캔 완료!",
-            message: "방 스캔이 완료되었습니다.\nUSDZ 파일이 저장되었습니다.",
+            title: "✅ 저장 완료!",
+            message: """
+            USDZ 파일이 성공적으로 저장되었습니다.
+            
+            📁 파일명: \(fileName)
+            📊 크기: \(fileSize)
+            📍 경로: \(fileURL.path)
+            
+            파일은 앱의 Documents 폴더에 저장되었습니다.
+            """,
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        alert.addAction(UIAlertAction(title: "파일 관리자 열기", style: .default) { _ in
+            self.openFileManager()
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func showSaveFailureAlert(errorMessage: String) {
+        let alert = UIAlertController(
+            title: "❌ 저장 실패",
+            message: """
+            USDZ 파일 저장에 실패했습니다.
+            
+            오류: \(errorMessage)
+            
+            다시 시도해주세요.
+            """,
             preferredStyle: .alert
         )
         
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
+    }
+    
+    private func openFileManager() {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileManagerVC = FileManagerViewController(directoryURL: documentsPath)
+        let navController = UINavigationController(rootViewController: fileManagerVC)
+        present(navController, animated: true)
+    }
+    
+    private func showScanResult(_ room: CapturedRoom) {
+        // 이 메서드는 더 이상 사용되지 않습니다.
+        // saveRoomAsUSDZ 메서드에서 직접 성공/실패 알림을 표시합니다.
+        print("스캔 결과 처리 완료")
     }
 }
